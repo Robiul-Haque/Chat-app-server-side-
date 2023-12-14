@@ -16,10 +16,10 @@ app.use('/uploads', express.static('./uploads'));
 // multer dest and filename config
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        return cb(null, "./uploads/user-img");
+        return cb(null, "./uploads/profile-img");
     },
     filename: (req, file, cb) => {
-        return cb(null, `user_img_${Date.now()}_${file.originalname}`);
+        return cb(null, `profile_img_${Date.now()}_${file.originalname}`);
     }
 });
 
@@ -41,11 +41,14 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
+        const chatApp = client.db('chat_app');
+        const users = chatApp.collection('user');
+
         app.listen(port, () => {
-            console.log(`Chat server listening on port ${port}`);
+            console.log(`Chat app server listening on port ${port}`);
         });
 
 
@@ -54,20 +57,27 @@ async function run() {
             res.send('Chat app server is running...');
         });
 
-        app.post('/user-profile-image', upload.single('image'), (req, res) => {
-            console.log("body", req.body);
-            console.log("file", req.file);
-            if (req.file) {
-                res.send({ mess: "Upload successful" });
-            } else {
-                res.send({ error: 'can not upload' });
+        app.post('/user-profile-image', upload.single('image'), async (req, res) => {
+            if (!req.body && !req.file) {
+                return res.status(404).json({ error: true, message: "Please fill the input box with correct information." });
             }
+
+            const userData = {
+                name: req.body?.name,
+                email: req.body?.email,
+                user_img_url: req.file?.path,
+                password: req.body?.password
+            }
+            const result = await users.insertOne(userData);
+            const domainName = req.get('origin');
+
+            res.status(200).send({ result, imgURL: `${domainName}/${req.file.path}` });
         });
         // backend api end
 
     } finally {
         // Ensures that the client will close when you finish/error
-        await client.close();
+        // await client.close();
     }
 }
 run().catch(console.dir);
